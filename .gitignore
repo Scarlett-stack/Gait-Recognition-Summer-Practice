@@ -1,0 +1,9 @@
+data/CASIA-B-GEI/
+
+datasets/output/
+!datasets/output/archive.zip
+
+#python bytecode files and system files
+__pycache__/
+*.pyc
+.DS_Store

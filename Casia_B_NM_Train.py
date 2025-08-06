@@ -2,7 +2,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 import torchvision.transforms as T
 from nm_loader import build_nm_protocol_files, list_nm_view, TRAIN_IDS, NM_ALL
-
+import os
 """
 pytorch dataloader are nevoie de clasa Dataset, plus ca vreau sa fac shuffle
 si le baga si etichete ce cute
@@ -17,7 +17,7 @@ class Casia_B_NM_Train(Dataset):
         self.transform = T.Compose([
             T.Resize((128,88)), #height si width
             T.ToTensor(),  #tensor pytorch [1, 128, 88], 1 e nr de canale = grayscale
-            T.Normalize([0.5, 0.5]) # x_norm = (x - mean) / std -> [-1, 1]
+            T.Normalize([0.5],[0.5]) # x_norm = (x - mean) / std -> [-1, 1]
         ])
     
     def __len__(self):

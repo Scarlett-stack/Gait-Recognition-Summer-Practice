@@ -23,12 +23,9 @@ def list_nm_view(root, subject_ids, nm_list):
             dir_secv = os.path.join(root, subject, nm) #verific daca exista, slabe sanse sa nu
             if not os.path.exists(dir_secv):
                 continue
-            for view in VIEWS:
-                p = os.path.join(root, subject, nm, view)
-                if os.path.exists(p):
-                    paths.append(p)
-                else:
-                    print(f"Warning: nu exista {p}")
+            #nu mai folosesc view ca unele nu au anumite view angles 
+            secv_pngs = sorted(glob.glob(os.path.join(dir_secv, "*.png")))
+            paths.extend(secv_pngs)
     return paths
 
 """

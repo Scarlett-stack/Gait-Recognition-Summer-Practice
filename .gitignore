@@ -1,7 +1,7 @@
 data/CASIA-B-GEI/
 
 datasets/output/
-datasets/output/archive.zip
+datasets/archive.zip
 
 #python bytecode files and system files
 __pycache__/

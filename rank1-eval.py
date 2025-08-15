@@ -7,6 +7,13 @@ from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 import torchvision.transforms as T
 
+import argparse
+from pathlib import Path
+from PIL import Image
+import numpy as np
+import matplotlib.pyplot as plt
+import random
+
 DATA_ROOT = "/home/daria/Documents/PRACTICA-CLEMENTIN/COD/data/CASIA-B-GEI"
 MODEL_PATH = "/home/daria/Documents/PRACTICA-CLEMENTIN/COD/models/gei_cnn_nm.pth"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -29,6 +36,13 @@ def subject_from_path(path):
     # ../<root>/<SID>/<nm-xx>/<view>.png 
     parts = os.path.normpath(path).split(os.sep)
     return parts[-3] if len(parts) >= 4 else None
+
+def angle_from_path(path):
+    try:
+        return int(Path(path).stem)   # '090' -> 90
+    except:
+        return -1
+
 
 transform = T.Compose([
     T.Resize((128, 88)),
@@ -94,26 +108,127 @@ def embed_files(model, files, batch=128):
 #rank -1 testing
 
 def rank1_test(probe_files, gallery_files, model):
-    P, p_labels , _ = embed_files(model, probe_files)
-    G, g_labels, _ = embed_files(model, gallery_files)
+    P, p_labels , p_paths = embed_files(model, probe_files)
+    G, g_labels, g_paths = embed_files(model, gallery_files)
 
     sims = P @ G.t() #similaritati cosinus intre probe si galerie
     nn_idx = sims.argmax(1)
     preds = g_labels[nn_idx]
     acc = (preds == p_labels).float().mean().item()
-    return acc
+    return acc, sims, nn_idx, (P, p_labels, p_paths), (G, g_labels, g_paths)
+
+#-----------------ok aici sunt functiile de debug si vizualizare---------------
+def show_random_matches(k, sims, nn_idx, probe_paths, p_labels, gallery_paths, g_labels):
+    k = min(k, len(probe_paths))
+    idxs = random.sample(range(len(probe_paths)), k)
+    print("\n===Random top-1 matches===")
+    for i in idxs:
+        cos = sims[i, nn_idx[i]].item()
+        print(f"[{i:4d}] TRUE={p_labels[i]} PRED={g_labels[nn_idx[i]]} cos={cos:.3f}")
+
+        fig, ax = plt.subplots(1, 2)
+        ax[0].imshow(Image.open(probe_paths[i]).convert("L"), cmap="gray")
+        ax[0].set_title(f"Probe (ID={p_labels[i]})")
+        ax[1].imshow(Image.open(gallery_paths[nn_idx[i]]).convert("L"), cmap='gray'); ax[1].set_title(f"Top-1 (ID={g_labels[nn_idx[i]]})")
+        for a in ax: a.axis('off')
+        plt.tight_layout(); plt.show()
+
+def per_view_accuracy(sims, nn_idx, probe_paths, p_labels, g_labels):
+    ok_by_angle, tot_by_angle = {}, {}
+    for i in range(len(probe_paths)):
+        a = angle_from_path(probe_paths[i])
+        correct = int(p_labels[i]) == int(g_labels[nn_idx[i]])
+        tot_by_angle[a] = tot_by_angle.get(a, 0) + 1
+        if correct: ok_by_angle[a] = ok_by_angle.get(a, 0) + 1
+    angles = sorted(tot_by_angle.keys())
+    accs = [ok_by_angle.get(a,0)/tot_by_angle[a] for a in angles]
+    print("\n=== Accuracy by view (probe) ===")
+    for a,acc in zip(angles, accs):
+        print(f"view {a:03d}: acc={acc:.3f}  (n={tot_by_angle[a]})")
+    # bar chart
+    plt.figure()
+    plt.bar([str(a) for a in angles], accs)
+    plt.xlabel("View angle"); plt.ylabel("Accuracy"); plt.title("Rank-1 by view (probe)")
+    plt.ylim(0,1); plt.tight_layout(); plt.show()
+
+
+def show_failures(m, sims, nn_idx, probe_paths, p_labels, gallery_paths, g_labels):
+    # sortăm greșitele după scor (cele mai “încrezătoare” greșeli primele)
+    wrong = [i for i in range(len(probe_paths)) if int(p_labels[i]) != int(g_labels[nn_idx[i]])]
+    if not wrong:
+        print("\nNicio greșeală în probe — nice! 🎉")
+        return
+    cos_scores = [sims[i, nn_idx[i]].item() for i in wrong]
+    order = np.argsort(cos_scores)[::-1]  # descrescător
+    wrong = [wrong[i] for i in order[:m]]
+    print(f"\n=== Top {len(wrong)} failures (by highest wrong cosine) ===")
+    for i in wrong:
+        cos = sims[i, nn_idx[i]].item()
+        print(f"[{i:4d}] TRUE={p_labels[i]}  PRED={g_labels[nn_idx[i]]}  view={angle_from_path(probe_paths[i])}  cos={cos:.3f}")
+        fig, ax = plt.subplots(1,2)
+        ax[0].imshow(Image.open(probe_paths[i]).convert("L"), cmap='gray'); ax[0].set_title(f"Probe (ID={p_labels[i]})")
+        ax[1].imshow(Image.open(gallery_paths[nn_idx[i]]).convert("L"), cmap='gray'); ax[1].set_title(f"Wrong Top-1 (ID={g_labels[nn_idx[i]]})")
+        for a in ax: a.axis('off')
+        plt.tight_layout(); plt.show()
+
+def tsne_plot(P, p_labels, G, g_labels):
+    try:
+        from sklearn.manifold import TSNE
+    except Exception:
+        print("[NOTE] scikit-learn nu e instalat (pip install scikit-learn) — sar peste t-SNE.")
+        return
+    Z_all = torch.cat([G, P], 0).numpy()
+    Y_all = torch.cat([g_labels, p_labels], 0).numpy()
+    Z2 = TSNE(n_components=2, perplexity=30, init="pca", learning_rate="auto").fit_transform(Z_all)
+    plt.figure()
+    plt.scatter(Z2[:,0], Z2[:,1], c=Y_all, s=6, cmap='tab20')
+    plt.title("t-SNE of GEI embeddings (gallery+probe)")
+    plt.xticks([]); plt.yticks([]); plt.tight_layout(); plt.show()
+
+
+# def main():
+#     gallery = list_nm_pngs(DATA_ROOT, TEST_IDS, NM_GALLERY)
+#     probe = list_nm_pngs(DATA_ROOT, TEST_IDS, NM_PROBE)
+#     print(f"Gallery: {len(gallery)} | Probe: {len(probe)}")
+
+#     if not gallery or not probe:
+#         print("[EROARE] Nu am găsit fișiere NM pentru test. Verifică structura: data/CASIA-B-GEI/<075..124>/nm-0*/<view>.png")
+#         return
+#     model = load_module()
+#     acc = rank1_test(probe, gallery, model)
+#     print(f"Rank-1 accuracy: {acc:.3f}")
 
 def main():
-    gallery = list_nm_pngs(DATA_ROOT, TEST_IDS, NM_GALLERY)
-    probe = list_nm_pngs(DATA_ROOT, TEST_IDS, NM_PROBE)
-    print(f"Gallery: {len(gallery)} | Probe: {len(probe)}")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--show-matches", type=int, default=0, help="arată N potriviri Top-1 random (cu imagini)")
+    ap.add_argument("--per-view", action="store_true", help="afișează acuratețe pe view (bar chart)")
+    ap.add_argument("--show-fails", type=int, default=0, help="arată N cazuri greșite (cu imagini)")
+    ap.add_argument("--tsne", action="store_true", help="desenează t-SNE al embedding-urilor")
+    args = ap.parse_args()
 
-    if not gallery or not probe:
-        print("[EROARE] Nu am găsit fișiere NM pentru test. Verifică structura: data/CASIA-B-GEI/<075..124>/nm-0*/<view>.png")
-        return
+    gallery_files = list_nm_pngs(DATA_ROOT, TEST_IDS, NM_GALLERY)
+    probe_files   = list_nm_pngs(DATA_ROOT, TEST_IDS, NM_PROBE)
+    print(f"Gallery: {len(gallery_files)} | Probe: {len(probe_files)}")
+
+    if not gallery_files or not probe_files:
+        print("[EROARE] Nu am găsit fișiere NM pentru test. Aștept structura data/CASIA-B-GEI/<075..124>/nm-0*/<view>.png")
+        sys.exit(1)
+
     model = load_module()
-    acc = rank1_test(probe, gallery, model)
-    print(f"Rank-1 accuracy: {acc:.3f}")
+    acc, sims, nn_idx, (P, p_labels, p_paths), (G, g_labels, g_paths) = rank1_test(probe_files, gallery_files, model)
+    print(f"Rank-1 (NM-only): {acc:.3f}")
+
+    if args.show_matches > 0:
+        show_random_matches(args.show_matches, sims, nn_idx, p_paths, p_labels, g_paths, g_labels)
+
+    if args.per_view:
+        per_view_accuracy(sims, nn_idx, p_paths, p_labels, g_labels)
+
+    if args.show_fails > 0:
+        show_failures(args.show_fails, sims, nn_idx, p_paths, p_labels, g_paths, g_labels)
+
+    if args.tsne:
+        tsne_plot(P, p_labels, G, g_labels)
 
 if __name__ == "__main__":
     main()

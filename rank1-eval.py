@@ -22,6 +22,9 @@ TEST_IDS = [f"{i:03d}" for i in range(75, 125)]
 NM_GALLERY = [f"nm-{i:02d}" for i in range(1, 5)]
 NM_PROBE = [f"nm-{i:02d}" for i in range(5, 7)]
 
+BG_PROBE   = [f"bg-{i:02d}" for i in range(1, 3)]
+CL_PROBE   = [f"cl-{i:02d}" for i in range(1, 3)]
+
 def list_nm_pngs(root, subject_ids, nm_list):
     files = []
     for sid in subject_ids:
@@ -200,14 +203,25 @@ def tsne_plot(P, p_labels, G, g_labels):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--probe", choices=["nm","bg","cl"], default="nm", help="ce tip de probe: nm (default), bg sau cl")
     ap.add_argument("--show-matches", type=int, default=0, help="arată N potriviri Top-1 random (cu imagini)")
     ap.add_argument("--per-view", action="store_true", help="afișează acuratețe pe view (bar chart)")
     ap.add_argument("--show-fails", type=int, default=0, help="arată N cazuri greșite (cu imagini)")
     ap.add_argument("--tsne", action="store_true", help="desenează t-SNE al embedding-urilor")
     args = ap.parse_args()
 
+
+    args = ap.parse_args()
+
+    if args.probe == "nm":
+        probe_list = NM_PROBE
+    elif args.probe == "bg":
+        probe_list = BG_PROBE
+    else:
+        probe_list = CL_PROBE
+
     gallery_files = list_nm_pngs(DATA_ROOT, TEST_IDS, NM_GALLERY)
-    probe_files   = list_nm_pngs(DATA_ROOT, TEST_IDS, NM_PROBE)
+    probe_files   = list_nm_pngs(DATA_ROOT, TEST_IDS, probe_list)
     print(f"Gallery: {len(gallery_files)} | Probe: {len(probe_files)}")
 
     if not gallery_files or not probe_files:

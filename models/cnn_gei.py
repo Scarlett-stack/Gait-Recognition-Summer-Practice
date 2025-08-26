@@ -15,7 +15,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 SEED = 42 
 DATA_ROOT = "/home/daria/Documents/PRACTICA-CLEMENTIN/COD/data/CASIA-B-GEI"
 SAVE_PATH = "models/gei_cnn_nm.pth"
-EPOCHS    = 20
+EPOCHS    = 50
 BATCH     = 64
 LR        = 1e-3
 #nu mai stiu in ce tutorial citisem dar e important sa ai acelasi seed si sa fie setat 

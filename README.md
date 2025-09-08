@@ -12,9 +12,6 @@ Ce urmeaza:
 - imbunatatire gei: experimentat cu diferite loss functions , LR schedule (StepLR, CosineAnnealingLR)
 - trb scris testarea
 
-(ia-labs-env) daria@Daria-Katana-17-B13VFK:~/Documents/PRACTICA-CLEMENTIN/COD$ 
-
-
 
 <h2> Table of contents </h2>
 
@@ -269,9 +266,9 @@ For $t = 1 \ldots L$, with input $\mathbf{f}_t$ and previous hidden $\mathbf{h}_
 
 - **Update gate** (how much to keep from the past):
 
-$$
+$
 \mathbf{z}_t = \sigma(W_z \mathbf{f}_t + U_z \mathbf{h}_{t-1} + \mathbf{b}_z)
-$$
+$
 
 - **Reset gate** (how much past to forget when proposing new info):
 

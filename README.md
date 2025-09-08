@@ -262,7 +262,10 @@ $$
 A **GRU (Gated Recurrent Unit)** processes the feature sequence and produces a sequence of hidden states,  
 keeping a *running memory* of past motion.
 
-For $$ t = 1 \ldots L$, with input $\mathbf{f}_t$ and previous hidden $\mathbf{h}_{t-1}$$ :
+For 
+$$ 
+t = 1 \ldots L, with input \mathbf{f}_t and previous hidden \mathbf{h}_{t-1}
+$$ :
 
 - **Update gate** (how much to keep from the past):
 
